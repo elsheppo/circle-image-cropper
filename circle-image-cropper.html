@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<!--
+       (       )  (      (             (    (        )       (          (         )    )          
+   (   )\ ) ( /(  )\ )   )\ )  *   )   )\ ) )\ )  ( /(       )\ )  *   ))\ )   ( /( ( /(   *   )  
+   )\ (()/( )\())(()/(  (()/(` )  /(  (()/((()/(  )\())(    (()/(` )  /(()/(   )\()))\())` )  /(  
+ (((_) /(_)|(_)\  /(_))  /(_))( )(_))  /(_))/(_))((_)\ )\    /(_))( )(_))(_)) ((_)\((_)\  ( )(_)) 
+ )\___(_))   ((_)(_))   (_)) (_(_())  (_)) (_)) |_ ((_|(_)  (_)) (_(_()|_))    _((_) ((_)(_(_())  
+((/ __| _ \ / _ \| _ \  |_ _||_   _|  | |  |_ _|| |/ /| __| |_ _||_   _/ __|  | || |/ _ \|_   _|  
+ | (__|   /| (_) |  _/   | |   | |    | |__ | |   ' < | _|   | |   | | \__ \  | __ | (_) | | |    
+  \___|_|_\ \___/|_|    |___|  |_|    |____|___| _|\_\|___| |___|  |_| |___/  |_||_|\___/  |_|    
+
+Welcome to the Circle Image Cropper! Feel free to explore the code and have fun customizing it.
+Happy cropping!
+-->
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Circle Image Cropper</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+      background-color: #f0f0f0;
+    }
+
+    #imageContainer {
+      position: relative;
+      margin: 20px 0;
+      overflow: hidden;
+    }
+
+    #uploadedImage {
+      display: block;
+      max-width: 100%;
+      height: auto;
+    }
+
+    #circleOverlay {
+      position: absolute;
+      border: 2px solid red;
+      border-radius: 50%;
+      cursor: move;
+      box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
+    }
+
+    #resizeHandle {
+      position: absolute;
+      width: 10px;
+      height: 10px;
+      background-color: red;
+      border-radius: 50%;
+      bottom: -5px;
+      right: -5px;
+      cursor: se-resize;
+    }
+
+    .controls {
+      margin-bottom: 10px;
+    }
+
+    input,
+    button {
+      margin: 5px 0;
+      padding: 5px;
+    }
+
+    #resultContainer {
+      text-align: center;
+      margin-top: 20px;
+    }
+
+    #croppedImage {
+      max-width: 100%;
+      height: auto;
+      border: 1px solid #ccc;
+    }
+  </style>
+</head>
+<body>
+  <h1>El Sheppo's Circle Image Cropper</h1>
+  <input type="file" id="imageInput" accept="image/*">
+  <div id="imageContainer">
+    <img id="uploadedImage" alt="Uploaded image">
+    <div id="circleOverlay">
+      <div id="resizeHandle"></div>
+    </div>
+  </div>
+  <div class="controls">
+    <label for="borderThickness">Border Thickness:</label>
+    <input type="range" id="borderThickness" min="0" max="20" value="0">
+    <label for="borderColor">Border Color:</label>
+    <input type="color" id="borderColor" value="#000000">
+  </div>
+  <button id="cropButton">Crop Image</button>
+  <div id="resultContainer" style="display:none;">
+    <h2>Cropped Image</h2>
+    <img id="croppedImage" alt="Cropped circular image">
+    <br>
+    <button id="copyButton">Copy Image</button>
+    <a id="downloadLink" download="cropped_image.png">
+      <button>Download Image</button>
+    </a>
+  </div>
+</body>
+</html>
+
+    <script>
+    (function() {
+        const imageInput = document.getElementById('imageInput');
+        const uploadedImage = document.getElementById('uploadedImage');
+        const imageContainer = document.getElementById('imageContainer');
+        const circleOverlay = document.getElementById('circleOverlay');
+        const resizeHandle = document.getElementById('resizeHandle');
+        const borderThickness = document.getElementById('borderThickness');
+        const borderColor = document.getElementById('borderColor');
+        const cropButton = document.getElementById('cropButton');
+        const resultContainer = document.getElementById('resultContainer');
+        const croppedImage = document.getElementById('croppedImage');
+        const copyButton = document.getElementById('copyButton');
+        const downloadLink = document.getElementById('downloadLink');
+    
+        let isDragging = false;
+        let isResizing = false;
+        let startX, startY, startLeft, startTop, startDiameter;
+    
+        imageInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    uploadedImage.src = e.target.result;
+                    uploadedImage.onload = initializeOverlay;
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+    
+        function initializeOverlay() {
+            const size = Math.min(uploadedImage.width, uploadedImage.height) / 2;
+            circleOverlay.style.width = circleOverlay.style.height = size + 'px';
+            circleOverlay.style.left = (uploadedImage.width - size) / 2 + 'px';
+            circleOverlay.style.top = (uploadedImage.height - size) / 2 + 'px';
+            circleOverlay.style.display = 'block';
+        }
+    
+        circleOverlay.addEventListener('mousedown', startDragResize);
+        circleOverlay.addEventListener('touchstart', startDragResize);
+    
+        document.addEventListener('mousemove', dragResize);
+        document.addEventListener('touchmove', dragResize);
+    
+        document.addEventListener('mouseup', stopDragResize);
+        document.addEventListener('touchend', stopDragResize);
+    
+        function startDragResize(e) {
+            e.preventDefault();
+            const touch = e.type === 'touchstart' ? e.touches[0] : e;
+            isDragging = touch.target === circleOverlay;
+            isResizing = touch.target === resizeHandle;
+            startX = touch.clientX;
+            startY = touch.clientY;
+            startLeft = circleOverlay.offsetLeft;
+            startTop = circleOverlay.offsetTop;
+            startDiameter = circleOverlay.offsetWidth;
+        }
+    
+        function dragResize(e) {
+            if (!isDragging && !isResizing) return;
+            e.preventDefault();
+            const touch = e.type === 'touchmove' ? e.touches[0] : e;
+            const dx = touch.clientX - startX;
+            const dy = touch.clientY - startY;
+    
+            if (isDragging) {
+                let newLeft = startLeft + dx;
+                let newTop = startTop + dy;
+                newLeft = Math.max(0, Math.min(newLeft, uploadedImage.width - circleOverlay.offsetWidth));
+                newTop = Math.max(0, Math.min(newTop, uploadedImage.height - circleOverlay.offsetHeight));
+                circleOverlay.style.left = newLeft + 'px';
+                circleOverlay.style.top = newTop + 'px';
+            } else if (isResizing) {
+                let newSize = startDiameter + Math.max(dx, dy);
+                newSize = Math.max(20, Math.min(newSize, uploadedImage.width - circleOverlay.offsetLeft, uploadedImage.height - circleOverlay.offsetTop));
+                circleOverlay.style.width = circleOverlay.style.height = newSize + 'px';
+            }
+        }
+    
+        function stopDragResize() {
+            isDragging = false;
+            isResizing = false;
+        }
+    
+        cropButton.addEventListener('click', cropImage);
+    
+        function cropImage() {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            const borderWidth = parseInt(borderThickness.value);
+            const diameter = circleOverlay.offsetWidth;
+            canvas.width = canvas.height = diameter + borderWidth * 2;
+    
+            ctx.beginPath();
+            ctx.arc(canvas.width / 2, canvas.height / 2, diameter / 2, 0, Math.PI * 2);
+            ctx.closePath();
+            ctx.clip();
+    
+            const scaleX = uploadedImage.naturalWidth / uploadedImage.width;
+            const scaleY = uploadedImage.naturalHeight / uploadedImage.height;
+    
+            ctx.drawImage(
+                uploadedImage,
+                (circleOverlay.offsetLeft - borderWidth) * scaleX,
+                (circleOverlay.offsetTop - borderWidth) * scaleY,
+                (diameter + borderWidth * 2) * scaleX,
+                (diameter + borderWidth * 2) * scaleY,
+                0, 0, canvas.width, canvas.height
+            );
+    
+            if (borderWidth > 0) {
+                ctx.strokeStyle = borderColor.value;
+                ctx.lineWidth = borderWidth * 2;
+                ctx.stroke();
+            }
+    
+            croppedImage.src = canvas.toDataURL('image/png');
+            downloadLink.href = croppedImage.src;
+            resultContainer.style.display = 'block';
+        }
+    
+        copyButton.addEventListener('click', copyToClipboard);
+    
+        function copyToClipboard() {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = croppedImage.naturalWidth;
+            canvas.height = croppedImage.naturalHeight;
+            ctx.drawImage(croppedImage, 0, 0);
+            canvas.toBlob(function(blob) {
+                const item = new ClipboardItem({ 'image/png': blob });
+                navigator.clipboard.write([item]).then(function() {
+                    alert('Image copied to clipboard!');
+                }, function(err) {
+                    console.error('Could not copy image: ', err);
+                });
+            });
+        }
+    
+        croppedImage.addEventListener('touchstart', function(e) {
+            e.preventDefault();
+        }, { passive: false });
+    
+        croppedImage.addEventListener('contextmenu', function(e) {
+            e.preventDefault();
+        });
+    })();
+    </script>
+    </body> </html>
