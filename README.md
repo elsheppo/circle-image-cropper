@@ -25,7 +25,7 @@ Circle Image Cropper is a simple, easy-to-use web application that lets you crop
 
 ## Installation
 
-No installation required! Just download the `index.html` file and open it in your favorite web browser.
+No installation required! Just download the `circle-image-cropper.html` file and open it in your favorite web browser.
 
 ## Credits
 
